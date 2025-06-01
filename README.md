@@ -84,7 +84,7 @@ To customize, edit the filter conditions inside `playlist.py` – e.g.:
 ```python
 if "copy" in full_path_lower or "backup" in full_path_lower:
     continue  # skip
-
+```
 
 ---
 
