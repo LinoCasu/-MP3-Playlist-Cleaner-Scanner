@@ -68,6 +68,26 @@ Use raw strings (`r"..."`) and double backslashes if needed.
 
 ---
 
+### 🧩 Tip: Adjusting Language-Specific Filters
+
+This script currently filters filenames and folder names using **German keywords** like:
+
+- `"kopie"` (copy)
+- `"musik"` (music)
+- `"native instruments"`
+- `"samples"`, `"whatsapp"`, `"telegram"`
+
+If you're using non-German systems or filenames, you might want to replace or **extend these keywords** (e.g., `"copy"` instead of `"kopie"`, `"audio"` instead of `"musik"`).
+
+To customize, edit the filter conditions inside `playlist.py` – e.g.:
+
+```python
+if "copy" in full_path_lower or "backup" in full_path_lower:
+    continue  # skip
+
+
+---
+
 ### 2. ✅ Change Playlist Output Location
 
 At the top of the script, modify:
