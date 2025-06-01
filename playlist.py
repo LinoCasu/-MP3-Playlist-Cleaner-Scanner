@@ -2,7 +2,7 @@ import os
 from mutagen import File
 from mutagen.mp3 import MP3
 
-# Paths to scan
+# Folders to scan
 search_paths = [
     r"C:\User\linoc\OneDrive\Musik",
     r"H:\ONEDRIVE\Musik",
@@ -15,11 +15,12 @@ search_paths = [
 playlist_path = r"D:\cleaned_playlist.m3u"
 log_path = r"D:\scan_log.txt"
 error_log_path = r"D:\scan_errors.txt"
+non_mp3_log_path = r"D:\non_mp3_report.txt"
 
 valid_files = []
 
-# Delete old outputs
-for file_path in [playlist_path, log_path, error_log_path]:
+# Delete old output files
+for file_path in [playlist_path, log_path, error_log_path, non_mp3_log_path]:
     try:
         if os.path.exists(file_path):
             os.remove(file_path)
@@ -45,7 +46,7 @@ for path in search_paths:
             full_path = os.path.join(root, file)
             full_path_lower = full_path.lower()
 
-            # Exclude invalid filenames or folders
+            # Exclude invalid patterns
             if (
                 not full_path_lower.endswith(".mp3")
                 or "kopie" in full_path_lower
@@ -58,10 +59,12 @@ for path in search_paths:
                 continue
 
             try:
-                # MIME validation
+                # Check MIME type
                 audio_check = File(full_path)
                 if not audio_check or not audio_check.mime or "audio/mpeg" not in audio_check.mime:
-                    print("❌ Not a valid MP3 (mime):", full_path)
+                    with open(non_mp3_log_path, "a", encoding="utf-8") as report:
+                        report.write(full_path + "\n")
+                    print("❌ Not a valid MP3 (MIME):", full_path)
                     continue
 
                 size_kb = os.path.getsize(full_path) / 1024
@@ -73,11 +76,10 @@ for path in search_paths:
                 tags = audio.tags
                 duration = audio.info.length if audio.info else 0
 
-                # A: Tagged MP3 with Artist + Title + >20s
+                # Case A: MP3 with Artist + Title + >20s
                 if tags:
                     artist = tags.get("TPE1")
                     title = tags.get("TIT2")
-
                     if artist and title and duration > 20:
                         print("✅ Accepted (tagged):", full_path)
                         valid_files.append(full_path)
@@ -85,16 +87,15 @@ for path in search_paths:
                     else:
                         print("❌ Incomplete tags:", full_path)
 
-                # B: Untagged, but path contains 'musik' + >2MB + >20s
+                # Case B: No tags, but 'musik' in path, >2MB and >20s
                 if "musik" in full_path_lower and size_kb > 2048 and duration > 20:
                     print("ℹ️ Accepted by path/size rule:", full_path)
                     valid_files.append(full_path)
                     continue
 
-                # C: Filename "Artist - Title", >250KB, >20s
-                filename = os.path.basename(full_path)
-                if " - " in filename and duration > 20:
-                    print("🎯 Accepted by filename:", full_path)
+                # Case C: Filename matches "Artist - Title" format
+                if " - " in os.path.basename(full_path) and duration > 20:
+                    print("🎯 Accepted by filename pattern:", full_path)
                     valid_files.append(full_path)
                     continue
 
@@ -108,7 +109,6 @@ for path in search_paths:
 print(f"\n✅ Total accepted: {len(valid_files)} MP3 files")
 print(f"💾 Saving playlist to: {playlist_path}")
 
-# Save playlist
 try:
     with open(playlist_path, "w", encoding="utf-8") as f:
         for track in valid_files:
