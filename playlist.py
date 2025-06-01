@@ -1,7 +1,8 @@
 import os
+from mutagen import File
 from mutagen.mp3 import MP3
 
-# Folders to scan
+# Paths to scan
 search_paths = [
     r"C:\User\linoc\OneDrive\Musik",
     r"H:\ONEDRIVE\Musik",
@@ -17,7 +18,7 @@ error_log_path = r"D:\scan_errors.txt"
 
 valid_files = []
 
-# Delete old files if they exist
+# Delete old outputs
 for file_path in [playlist_path, log_path, error_log_path]:
     try:
         if os.path.exists(file_path):
@@ -28,7 +29,6 @@ for file_path in [playlist_path, log_path, error_log_path]:
 
 print("🔍 Starting deep scan...\n")
 
-# Recursive scan with symbolic link support
 for path in search_paths:
     for root, dirs, files in os.walk(path, followlinks=True):
         try:
@@ -39,13 +39,13 @@ for path in search_paths:
             continue
 
         if "backup\\backup" in root.lower():
-            print(f"📁 Deep backup folder detected: {root}")
+            print(f"📁 Detected backup subfolder: {root}")
 
         for file in files:
             full_path = os.path.join(root, file)
             full_path_lower = full_path.lower()
 
-            # Filter out excluded folders or filenames
+            # Exclude invalid filenames or folders
             if (
                 not full_path_lower.endswith(".mp3")
                 or "kopie" in full_path_lower
@@ -54,10 +54,16 @@ for path in search_paths:
                 or "whatsapp" in full_path_lower
                 or "telegram" in full_path_lower
             ):
-                print("🚫 Skipped (excluded):", full_path)
+                print("🚫 Skipped (exclusion rule):", full_path)
                 continue
 
             try:
+                # MIME validation
+                audio_check = File(full_path)
+                if not audio_check or not audio_check.mime or "audio/mpeg" not in audio_check.mime:
+                    print("❌ Not a valid MP3 (mime):", full_path)
+                    continue
+
                 size_kb = os.path.getsize(full_path) / 1024
                 if size_kb < 250:
                     print("❌ Too small (<250KB):", full_path)
@@ -67,7 +73,7 @@ for path in search_paths:
                 tags = audio.tags
                 duration = audio.info.length if audio.info else 0
 
-                # Case A: Properly tagged MP3 with Artist + Title + >20s
+                # A: Tagged MP3 with Artist + Title + >20s
                 if tags:
                     artist = tags.get("TPE1")
                     title = tags.get("TIT2")
@@ -77,15 +83,15 @@ for path in search_paths:
                         valid_files.append(full_path)
                         continue
                     else:
-                        print("❌ Missing tags (Artist/Title):", full_path)
+                        print("❌ Incomplete tags:", full_path)
 
-                # Case B: No tags, but located in 'musik' path and >2MB
+                # B: Untagged, but path contains 'musik' + >2MB + >20s
                 if "musik" in full_path_lower and size_kb > 2048 and duration > 20:
-                    print("ℹ️ Accepted by size/path rule (musik >2MB):", full_path)
+                    print("ℹ️ Accepted by path/size rule:", full_path)
                     valid_files.append(full_path)
                     continue
 
-                # Case C: Filename follows "Artist - Title" format, >250KB & >20s
+                # C: Filename "Artist - Title", >250KB, >20s
                 filename = os.path.basename(full_path)
                 if " - " in filename and duration > 20:
                     print("🎯 Accepted by filename:", full_path)
@@ -97,12 +103,12 @@ for path in search_paths:
             except Exception:
                 with open(error_log_path, "a", encoding="utf-8") as error_log:
                     error_log.write(f"Error reading file: {full_path}\n")
-                print("⚠️ Failed to read file:", full_path)
+                print("⚠️ Error reading file:", full_path)
 
 print(f"\n✅ Total accepted: {len(valid_files)} MP3 files")
 print(f"💾 Saving playlist to: {playlist_path}")
 
-# Save the final playlist
+# Save playlist
 try:
     with open(playlist_path, "w", encoding="utf-8") as f:
         for track in valid_files:
