@@ -19,7 +19,7 @@ non_mp3_log_path = r"D:\non_mp3_report.txt"
 
 valid_files = []
 
-# Delete old output files
+# Clean old output files
 for file_path in [playlist_path, log_path, error_log_path, non_mp3_log_path]:
     try:
         if os.path.exists(file_path):
@@ -39,14 +39,10 @@ for path in search_paths:
             print(f"❌ Cannot write to log file: {log_path}")
             continue
 
-        if "backup\\backup" in root.lower():
-            print(f"📁 Detected backup subfolder: {root}")
-
         for file in files:
             full_path = os.path.join(root, file)
             full_path_lower = full_path.lower()
 
-            # Exclude invalid patterns
             if (
                 not full_path_lower.endswith(".mp3")
                 or "kopie" in full_path_lower
@@ -59,7 +55,6 @@ for path in search_paths:
                 continue
 
             try:
-                # Check MIME type
                 audio_check = File(full_path)
                 if not audio_check or not audio_check.mime or "audio/mpeg" not in audio_check.mime:
                     with open(non_mp3_log_path, "a", encoding="utf-8") as report:
@@ -76,7 +71,6 @@ for path in search_paths:
                 tags = audio.tags
                 duration = audio.info.length if audio.info else 0
 
-                # Case A: MP3 with Artist + Title + >20s
                 if tags:
                     artist = tags.get("TPE1")
                     title = tags.get("TIT2")
@@ -87,14 +81,13 @@ for path in search_paths:
                     else:
                         print("❌ Incomplete tags:", full_path)
 
-                # Case B: No tags, but 'musik' in path, >2MB and >20s
                 if "musik" in full_path_lower and size_kb > 2048 and duration > 20:
                     print("ℹ️ Accepted by path/size rule:", full_path)
                     valid_files.append(full_path)
                     continue
 
-                # Case C: Filename matches "Artist - Title" format
-                if " - " in os.path.basename(full_path) and duration > 20:
+                filename = os.path.basename(full_path)
+                if " - " in filename and duration > 20:
                     print("🎯 Accepted by filename pattern:", full_path)
                     valid_files.append(full_path)
                     continue
@@ -106,13 +99,33 @@ for path in search_paths:
                     error_log.write(f"Error reading file: {full_path}\n")
                 print("⚠️ Error reading file:", full_path)
 
-print(f"\n✅ Total accepted: {len(valid_files)} MP3 files")
-print(f"💾 Saving playlist to: {playlist_path}")
+# --- FINAL CLEANING PASS ---
+final_valid_files = []
+unwanted_extensions = [
+    ".zip", ".rar", ".7z", ".tar", ".gz", ".php", ".html", ".htm", ".txt",
+    ".ini", ".bak", ".pdf", ".docx", ".csv", ".json"
+]
+unwanted_folders = [
+    "wp-content", "updraft", "backup\\backup", "wordpress", "temp", "cache", "web", "site"
+]
+
+for track in valid_files:
+    track_lower = track.lower()
+    if any(track_lower.endswith(ext) for ext in unwanted_extensions):
+        print("🧹 Removed (unwanted extension):", track)
+        continue
+    if any(bad_folder in track_lower for bad_folder in unwanted_folders):
+        print("🧹 Removed (unwanted folder):", track)
+        continue
+    final_valid_files.append(track)
+
+print(f"\n✅ Final valid entries: {len(final_valid_files)} files")
+print(f"💾 Writing cleaned playlist to: {playlist_path}")
 
 try:
     with open(playlist_path, "w", encoding="utf-8") as f:
-        for track in valid_files:
+        for track in final_valid_files:
             f.write(track + "\n")
-    print("🎉 Done! Playlist saved.")
+    print("🎉 Final cleaned playlist saved.")
 except Exception as e:
     print(f"❌ Failed to write playlist: {e}")
