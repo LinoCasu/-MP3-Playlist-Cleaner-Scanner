@@ -19,6 +19,17 @@ non_mp3_log_path = r"D:\non_mp3_report.txt"
 
 valid_files = []
 
+# Cleaning parameters
+max_path_depth = 8
+unwanted_extensions = [
+    ".zip", ".rar", ".7z", ".tar", ".gz", ".php", ".html", ".htm", ".txt",
+    ".ini", ".bak", ".pdf", ".docx", ".csv", ".json", ".mp4", ".ogg"
+]
+unwanted_folders = [
+    "wp-content", "updraft", "backup\\backup", "wordpress", "temp", "cache", "web",
+    "site", "virtualbox", "vmware", "hyperv", "mount", "mnt", "steamapps"
+]
+
 # Clean old output files
 for file_path in [playlist_path, log_path, error_log_path, non_mp3_log_path]:
     try:
@@ -43,15 +54,19 @@ for path in search_paths:
             full_path = os.path.join(root, file)
             full_path_lower = full_path.lower()
 
+            # Skip based on extensions and unwanted folder keywords
             if (
                 not full_path_lower.endswith(".mp3")
+                or any(ext in full_path_lower for ext in unwanted_extensions)
+                or any(folder in full_path_lower for folder in unwanted_folders)
+                or full_path_lower.count("\\") > max_path_depth
                 or "kopie" in full_path_lower
                 or "samples" in full_path_lower
                 or "native instruments" in full_path_lower
                 or "whatsapp" in full_path_lower
                 or "telegram" in full_path_lower
             ):
-                print("🚫 Skipped (exclusion rule):", full_path)
+                print("🚫 Skipped (rule):", full_path)
                 continue
 
             try:
@@ -99,32 +114,12 @@ for path in search_paths:
                     error_log.write(f"Error reading file: {full_path}\n")
                 print("⚠️ Error reading file:", full_path)
 
-# --- FINAL CLEANING PASS ---
-final_valid_files = []
-unwanted_extensions = [
-    ".zip", ".rar", ".7z", ".tar", ".gz", ".php", ".html", ".htm", ".txt",
-    ".ini", ".bak", ".pdf", ".docx", ".csv", ".json"
-]
-unwanted_folders = [
-    "wp-content", "updraft", "backup\\backup", "wordpress", "temp", "cache", "web", "site"
-]
-
-for track in valid_files:
-    track_lower = track.lower()
-    if any(track_lower.endswith(ext) for ext in unwanted_extensions):
-        print("🧹 Removed (unwanted extension):", track)
-        continue
-    if any(bad_folder in track_lower for bad_folder in unwanted_folders):
-        print("🧹 Removed (unwanted folder):", track)
-        continue
-    final_valid_files.append(track)
-
-print(f"\n✅ Final valid entries: {len(final_valid_files)} files")
+print(f"\n✅ Final valid entries: {len(valid_files)} files")
 print(f"💾 Writing cleaned playlist to: {playlist_path}")
 
 try:
     with open(playlist_path, "w", encoding="utf-8") as f:
-        for track in final_valid_files:
+        for track in valid_files:
             f.write(track + "\n")
     print("🎉 Final cleaned playlist saved.")
 except Exception as e:
